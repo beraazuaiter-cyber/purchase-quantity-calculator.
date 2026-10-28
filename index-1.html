@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#124567">
+<link rel="manifest" href="./manifest.json">
+<title>حساب مخزون المشتريات</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#18354a;font-family:system-ui,Tahoma,Arial,sans-serif}header{background:#124567;color:white;padding:24px 18px;text-align:center}header h1{margin:0 0 8px;font-size:clamp(23px,5vw,34px)}header p{margin:0;opacity:.9}main{max-width:920px;margin:auto;padding:16px}.card{background:white;border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 2px 14px #18354a12}h2{font-size:21px;margin:0 0 18px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}label{display:block;margin-bottom:7px;font-size:14px}input{width:100%;padding:12px;border:1px solid #cbd6dd;border-radius:10px;font:inherit;color:#18354a;background:#fff}button{background:#16749e;color:white;border:0;border-radius:11px;padding:12px 18px;font:inherit;cursor:pointer;margin:4px 0}button.secondary{background:#e7f0f5;color:#18354a}button.danger{background:#a63434}button:disabled{opacity:.5}.shipment{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin:12px 0}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.metric{background:#edf6fa;border-radius:12px;padding:14px}.metric b{display:block;font-size:21px;margin-top:7px;overflow-wrap:anywhere}.note{color:#566b7c;font-size:14px;line-height:1.7}.warning{color:#a63434;font-weight:700}.ok{color:#146c45;font-weight:700}canvas{width:100%;height:300px;display:block}.legend{display:flex;flex-wrap:wrap;gap:15px;font-size:13px;margin-top:8px}.legend span:before{content:'';display:inline-block;width:18px;height:3px;background:var(--c);vertical-align:middle;margin-left:6px}footer{text-align:center;padding:20px;color:#667987}@media(max-width:480px){.grid,.metrics{grid-template-columns:1fr 1fr}.card{padding:15px}.shipment{grid-template-columns:1fr 1fr}.shipment button{grid-column:1/-1}canvas{height:260px}}@media print{body{background:#fff}header{background:#fff;color:#18354a;border-bottom:2px solid #18354a}button,.no-print{display:none!important}.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}main{max-width:none}canvas{height:260px}}
+</style>
+</head>
+<body>
+<header><h1>حساب مخزون المشتريات</h1><p>متى نعيد الطلب؟ ومتى ينفد المخزون؟</p></header>
+<main>
+<section class="card"><h2>المادة والمخزون</h2><div class="grid">
+<div><label for="material">اسم المادة</label><input id="material" value="مادة خام"></div>
+<div><label for="start">تاريخ الحساب</label><input id="start" type="date" value="2026-10-28"></div>
+<div><label for="stock">المخزون الحالي (طن)</label><input id="stock" type="number" min="0" step="any" value="670"></div>
+<div><label for="monthly">الاستهلاك الشهري (طن)</label><input id="monthly" type="number" min="0" step="any" value="390"></div>
+<div><label for="lead">مدة التوريد (يوم)</label><input id="lead" type="number" min="0" value="60"></div>
+<div><label for="safety">مخزون الأمان (يوم)</label><input id="safety" type="number" min="0" value="15"></div>
+</div></section>
+<section class="card"><h2>الشحنات القادمة</h2><div id="shipments"></div><button type="button" id="add">+ إضافة شحنة</button><p class="note">أدخل تاريخ وصول الشحنة إلى المصنع، وليس وصولها إلى الميناء.</p></section>
+<section class="card"><h2>تحليل المخزون وتخطيط المشتريات</h2><div class="metrics">
+<div class="metric">موعد إعادة الطلب<b id="order">—</b></div>
+<div class="metric">تاريخ نفاد المخزون<b id="zero">—</b></div>
+<div class="metric">مخزون الأمان المستهدف<b id="safeqty">—</b></div>
+<div class="metric">الكمية المقترحة للشراء<b id="suggested">—</b></div>
+</div><p id="notice" class="note" role="status"></p></section>
+<section class="card"><h2>منحنى المخزون</h2><canvas id="chart" aria-label="منحنى المخزون المتوقع" role="img"></canvas><div class="legend"><span style="--c:#16749e">المخزون المتوقع</span><span style="--c:#d28a1c">مستوى إعادة الطلب</span><span style="--c:#c43b3b">الصفر</span></div><p class="note">الخط الأزرق: المخزون المتوقع. البرتقالي: نقطة إعادة الطلب. الأحمر: مستوى الصفر. ارتفاع الخط يعني وصول شحنة.</p></section>
+<section class="card"><h2>حفظ ومشاركة التقرير</h2><button onclick="window.print()">حفظ PDF</button> <button onclick="window.print()">طباعة</button> <button class="secondary" id="copy">نسخ الملخص</button><p class="note">لحفظ PDF اختر «حفظ كملف PDF» من نافذة الطباعة على هاتفك.</p></section>
+</main><footer>حاسبة تخطيط المشتريات — جميع الحسابات تقديرية وتعتمد على المدخلات</footer>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),ids=['material','start','stock','monthly','lead','safety'];
+let shipments=[];let summary='';
+const num=id=>Math.max(0,Number($(id).value)||0);
+const date=s=>{if(!s)return null;let d=new Date(s+'T12:00:00');return isNaN(d)?null:d};
+const plus=(d,n)=>{let a=new Date(d);a.setDate(a.getDate()+n);return a};
+const iso=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+const fmt=d=>d?d.toLocaleDateString('ar', {year:'numeric',month:'2-digit',day:'2-digit'}):'غير محدد';
+const nfmt=n=>Number(n).toLocaleString('ar',{maximumFractionDigits:1});
+function persist(){try{localStorage.setItem('purchase-inventory-v2',JSON.stringify({values:Object.fromEntries(ids.map(id=>[id,$(id).value])),shipments}))}catch(e){}}
+function load(){try{let saved=JSON.parse(localStorage.getItem('purchase-inventory-v2'));if(saved){for(let id of ids)if(saved.values&&saved.values[id]!=null)$(id).value=saved.values[id];shipments=Array.isArray(saved.shipments)?saved.shipments:[]}}catch(e){}}
+function renderShipments(){let host=$('shipments');host.replaceChildren();shipments.forEach((s,i)=>{let wrap=document.createElement('div');wrap.className='shipment';let a=document.createElement('div');let la=document.createElement('label');la.textContent='الكمية (طن)';let qty=document.createElement('input');qty.type='number';qty.min='0';qty.step='any';qty.value=s.qty;qty.addEventListener('input',()=>{shipments[i].qty=qty.value;calc()});a.append(la,qty);let b=document.createElement('div');let lb=document.createElement('label');lb.textContent='تاريخ وصول المصنع';let dt=document.createElement('input');dt.type='date';dt.value=s.arrival;dt.addEventListener('input',()=>{shipments[i].arrival=dt.value;calc()});b.append(lb,dt);let del=document.createElement('button');del.className='danger';del.textContent='حذف';del.onclick=()=>{shipments.splice(i,1);renderShipments();calc()};wrap.append(a,b,del);host.append(wrap)})}
+function draw(rows,threshold){let c=$('chart'),rect=c.getBoundingClientRect(),w=Math.max(290,rect.width),h=Math.max(220,rect.height),ratio=Math.min(devicePixelRatio||1,2);c.width=w*ratio;c.height=h*ratio;let ctx=c.getContext('2d');ctx.scale(ratio,ratio);ctx.clearRect(0,0,w,h);let L=52,R=14,T=16,B=42,pw=w-L-R,ph=h-T-B;let vals=rows.map(r=>r.stock),max=Math.max(1,threshold,...vals)*1.12,min=Math.min(0,...vals)*1.08;let y=v=>T+(max-v)/(max-min)*ph,x=i=>L+i/Math.max(1,rows.length-1)*pw;ctx.font='12px Arial';ctx.textAlign='right';ctx.fillStyle='#536b7a';for(let j=0;j<=4;j++){let v=min+(max-min)*j/4,yy=y(v);ctx.strokeStyle='#e6ebef';ctx.beginPath();ctx.moveTo(L,yy);ctx.lineTo(w-R,yy);ctx.stroke();ctx.fillText(nfmt(v),L-7,yy+4)}function line(v,color,dashed){ctx.save();ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.setLineDash(dashed?[6,5]:[]);ctx.beginPath();ctx.moveTo(L,y(v));ctx.lineTo(w-R,y(v));ctx.stroke();ctx.restore()}line(0,'#c43b3b',false);line(threshold,'#d28a1c',true);ctx.beginPath();rows.forEach((r,i)=>{if(i===0)ctx.moveTo(x(i),y(r.stock));else ctx.lineTo(x(i),y(r.stock))});ctx.strokeStyle='#16749e';ctx.lineWidth=2.8;ctx.stroke();ctx.fillStyle='#536b7a';ctx.textAlign='center';for(let i of [0,Math.floor((rows.length-1)/2),rows.length-1])ctx.fillText(fmt(rows[i].date),x(i),h-15)}
+function calc(){let start=date($('start').value),daily=num('monthly')/30,lead=num('lead'),safeDays=num('safety'),initial=num('stock'),threshold=daily*(lead+safeDays),safe=daily*safeDays; $('safeqty').textContent=nfmt(safe)+' طن';if(!start){$('notice').textContent='يرجى إدخال تاريخ صحيح.';return}let deliveries=shipments.map(s=>({date:date(s.arrival),qty:Math.max(0,Number(s.qty)||0)})).filter(s=>s.date&&s.qty>0);let rows=[],order=null,zero=null,stock=initial;let horizon= Math.max(180,Math.ceil(lead)+90, ...deliveries.map(s=>Math.ceil((s.date-start)/86400000)+60));horizon=Math.min(730,horizon);for(let i=0;i<=horizon;i++){let d=plus(start,i);if(i>0)stock-=daily;for(let s of deliveries)if(iso(s.date)===iso(d))stock+=s.qty;rows.push({date:d,stock});if(order===null&&stock<=threshold)order=d;if(zero===null&&stock<=0)zero=d}let suggested=Math.max(0,Math.ceil((threshold+daily*30-initial-deliveries.filter(s=>s.date<=plus(start,lead)).reduce((sum,s)=>sum+s.qty,0))/10)*10);$('order').textContent=order?fmt(order):'بعد فترة التوقع';$('zero').textContent=zero?fmt(zero):'لا ينفد خلال التوقع';$('suggested').textContent=nfmt(suggested)+' طن';let late=order&&order<=start;$('notice').className=late?'note warning':'note ok';$('notice').textContent=late?'المخزون عند نقطة إعادة الطلب أو أقل: راجع موعد الشراء فوراً.':'التواريخ تقديرية؛ راجع مدة التوريد وتواريخ الشحنات بانتظام.';summary=`المادة: ${$('material').value}\nالمخزون الحالي: ${nfmt(initial)} طن\nالاستهلاك الشهري: ${nfmt(num('monthly'))} طن\nمدة التوريد: ${lead} يوم\nموعد إعادة الطلب: ${$('order').textContent}\nتاريخ نفاد المخزون: ${$('zero').textContent}\nالكمية المقترحة: ${$('suggested').textContent}`;draw(rows,threshold);persist()}
+$('add').onclick=()=>{shipments.push({qty:'',arrival:''});renderShipments();calc()};$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(summary);alert('تم نسخ الملخص')}catch(e){prompt('انسخ الملخص:',summary)}};ids.forEach(id=>$(id).addEventListener('input',calc));window.addEventListener('resize',calc);load();renderShipments();calc();
+</script>
+</body></html>
