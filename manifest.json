@@ -1,0 +1,13 @@
+
+{
+  "name": "حساب مخزون المشتريات",
+  "short_name": "حاسبة المخزون",
+  "description": "حساب المخزون وتخطيط المشتريات ومواعيد إعادة الطلب",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/purchase-quantity-calculator/",
+  "scope": "/purchase-quantity-calculator/",
+  "display": "standalone",
+  "background_color": "#f3f6fa",
+  "theme_color": "#124567"
+}
