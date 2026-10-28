@@ -48,4 +48,11 @@ function draw(rows,threshold){let c=$('chart'),rect=c.getBoundingClientRect(),w=
 function calc(){let start=date($('start').value),daily=num('monthly')/30,lead=num('lead'),safeDays=num('safety'),initial=num('stock'),threshold=daily*(lead+safeDays),safe=daily*safeDays; $('safeqty').textContent=nfmt(safe)+' طن';if(!start){$('notice').textContent='يرجى إدخال تاريخ صحيح.';return}let deliveries=shipments.map(s=>({date:date(s.arrival),qty:Math.max(0,Number(s.qty)||0)})).filter(s=>s.date&&s.qty>0);let rows=[],order=null,zero=null,stock=initial;let horizon= Math.max(180,Math.ceil(lead)+90, ...deliveries.map(s=>Math.ceil((s.date-start)/86400000)+60));horizon=Math.min(730,horizon);for(let i=0;i<=horizon;i++){let d=plus(start,i);if(i>0)stock-=daily;for(let s of deliveries)if(iso(s.date)===iso(d))stock+=s.qty;rows.push({date:d,stock});if(order===null&&stock<=threshold)order=d;if(zero===null&&stock<=0)zero=d}let suggested=Math.max(0,Math.ceil((threshold+daily*30-initial-deliveries.filter(s=>s.date<=plus(start,lead)).reduce((sum,s)=>sum+s.qty,0))/10)*10);$('order').textContent=order?fmt(order):'بعد فترة التوقع';$('zero').textContent=zero?fmt(zero):'لا ينفد خلال التوقع';$('suggested').textContent=nfmt(suggested)+' طن';let late=order&&order<=start;$('notice').className=late?'note warning':'note ok';$('notice').textContent=late?'المخزون عند نقطة إعادة الطلب أو أقل: راجع موعد الشراء فوراً.':'التواريخ تقديرية؛ راجع مدة التوريد وتواريخ الشحنات بانتظام.';summary=`المادة: ${$('material').value}\nالمخزون الحالي: ${nfmt(initial)} طن\nالاستهلاك الشهري: ${nfmt(num('monthly'))} طن\nمدة التوريد: ${lead} يوم\nموعد إعادة الطلب: ${$('order').textContent}\nتاريخ نفاد المخزون: ${$('zero').textContent}\nالكمية المقترحة: ${$('suggested').textContent}`;draw(rows,threshold);persist()}
 $('add').onclick=()=>{shipments.push({qty:'',arrival:''});renderShipments();calc()};$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(summary);alert('تم نسخ الملخص')}catch(e){prompt('انسخ الملخص:',summary)}};ids.forEach(id=>$(id).addEventListener('input',calc));window.addEventListener('resize',calc);load();renderShipments();calc();
 </script>
+  <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js');
+  });
+}
+</script>
 </body></html>
